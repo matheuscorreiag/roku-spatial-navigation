@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- A right-side modal. `spatialScope` marks the whole subtree as a self-contained
+     focus scope: SpatialNavRoot's base walk SKIPS it, and the scene opens it as a
+     trapped scope with sendFocusTo(). Its option cards are ordinary focusables. -->
+<component name="Modal" extends="Group">
+    <interface>
+        <field id="spatialScope" type="boolean" value="true" />
+        <!-- id of the chosen option (alwaysNotify) -->
+        <field id="selected" type="string" alwaysNotify="true" />
+        <function name="open" />
+        <function name="close" />
+    </interface>
+    <children>
+        <Rectangle id="scrim" width="1280" height="720" color="0x000000B0" />
+        <Rectangle id="panel" width="520" height="720" translation="[760, 0]" color="0x171C22FF" />
+        <Label font="font:LargeBoldSystemFont" text="Trapped scope" width="460" height="50" translation="[790, 56]" color="0xFFFFFFFF" />
+        <Label font="font:SmallSystemFont" text="Arrows stay here. Back returns." width="460" height="32" translation="[790, 104]" color="0x8EA6C1FF" />
+
+        <FocusCard id="opt1" text="Option 1" width="460" height="64" translation="[790, 160]" spatialDefault="true" />
+        <FocusCard id="opt2" text="Option 2" width="460" height="64" translation="[790, 240]" />
+        <FocusCard id="opt3" text="Option 3" width="460" height="64" translation="[790, 320]" />
+    </children>
+</component>

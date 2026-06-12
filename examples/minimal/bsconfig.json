@@ -1,0 +1,13 @@
+{
+    "rootDir": ".",
+    "files": [
+        "manifest",
+        "source/**/*.*",
+        "components/**/*.*"
+    ],
+    "stagingDir": "out/staging",
+    "outFile": "out/spatialnav-demo.zip",
+    "createPackage": true,
+    "autoImportComponentScript": true,
+    "diagnosticLevel": "warn"
+}

@@ -1,0 +1,43 @@
+sub init()
+    m.bg = m.top.findNode("bg")
+    m.label = m.top.findNode("label")
+    onLayout()
+    onTextChanged()
+    applyFocus(false)
+    ' focusedChild fires when this node gains/loses focus.
+    m.top.observeField("focusedChild", "onFocusChanged")
+end sub
+
+sub onLayout()
+    m.bg.width = m.top.width
+    m.bg.height = m.top.height
+    m.label.width = m.top.width
+    m.label.height = m.top.height
+end sub
+
+sub onTextChanged()
+    m.label.text = m.top.text
+end sub
+
+sub onFocusChanged()
+    applyFocus(m.top.isInFocusChain())
+end sub
+
+sub applyFocus(focused as boolean)
+    if focused
+        m.bg.color = "0xFFFFFFFF"   ' white when focused
+        m.label.color = "0x111111FF"
+    else
+        m.bg.color = "0x1B1F2AFF"
+        m.label.color = "0xFFFFFFFF"
+    end if
+end sub
+
+' Let arrow keys bubble to SpatialNavRoot; only consume OK.
+function onKeyEvent(key as string, press as boolean) as boolean
+    if press and key = "OK"
+        m.top.selected = true
+        return true
+    end if
+    return false
+end function

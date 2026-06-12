@@ -1,0 +1,221 @@
+' Geometric LRUD spatial navigation engine.
+'
+' Inspired by bamlab/react-tv-space-navigation, but instead of LRUD's tree-walk it
+' uses Roku's one genuine advantage: node.sceneBoundingRect() gives every node its
+' absolute on-screen rect after layout, so the next focusable is picked by REAL
+' geometry (nearest neighbour in the pressed direction) rather than by
+' hand-maintained indices.
+'
+' This is the low-level engine. Most apps use the SpatialNavRoot component, which
+' wraps it; reach for these functions directly only if you want to drive focus
+' yourself. A "scope" (from create()/scope()) is just an associative array you keep
+' and pass back in.
+'
+'     m.nav = SpatialNav.scope(m.top)        ' gather marked focusables in subtree
+'     SpatialNav.focusDefault(m.nav)          ' land initial focus
+'     ...
+'     ' in onKeyEvent (press only):
+'     return SpatialNav.handleKey(m.nav, key) ' true = consumed, false = bubble
+
+namespace SpatialNav
+
+    ' A candidate is only eligible if it overlaps the current node on the
+    ' perpendicular axis — Left/Right needs vertical overlap, Up/Down needs
+    ' horizontal overlap. This keeps moves predictable (a Left press never
+    ' teleports diagonally to something that's really *above* you) while still
+    ' allowing big in-row/in-column gap jumps. Among eligible candidates,
+    ' perpendicular misalignment is a tie-breaker so the best-aligned one wins.
+    const ALIGN_WEIGHT = 2.0
+
+    ' ---- markers ------------------------------------------------------------
+    ' Fields a node carries to opt into spatial navigation. Declare them on your
+    ' focusable components' interfaces (or set them in code for built-in nodes):
+    '   spatialFocusable = true  -> included in the scope, treated as a leaf
+    '   spatialDefault   = true  -> receives focus when the scope activates
+    '   spatialScope     = true  -> a self-contained sub-scope (a sheet/modal);
+    '                               the subtree walk skips it, and it's navigated
+    '                               separately via SpatialNavRoot.sendFocusTo()
+    const FIELD_FOCUSABLE = "spatialFocusable"
+    const FIELD_DEFAULT = "spatialDefault"
+    const FIELD_SCOPE = "spatialScope"
+
+    ' ---- public API ---------------------------------------------------------
+
+    ' An empty focus scope. Store the returned object and pass it back in.
+    function create() as object
+        return { focusables: [], current: invalid, default: invalid }
+    end function
+
+    ' Build a scope by walking a subtree and collecting every node marked
+    ' `spatialFocusable` (the react-tv-space-navigation "context" model: focusables
+    ' declare themselves, the root gathers them). Marked nodes are treated as
+    ' leaves — we don't descend into them — so a focusable that owns its internals
+    ' (a custom button, a MarkupList) is registered whole. Run this AFTER the
+    ' subtree is built; since children init() before their parent, a container
+    ' calling this in its own init() sees everything, including code-created nodes.
+    function scope(root as object) as object
+        nav = create()
+        collect(nav, root)
+        return nav
+    end function
+
+    sub collect(nav as object, node as object)
+        kids = node.getChildren(-1, 0)
+        if kids = invalid then return
+        for each child in kids
+            if child.hasField(FIELD_SCOPE) and child[FIELD_SCOPE] = true
+                ' a self-contained sub-scope (sheet/modal) — owned by sendFocusTo
+            else if child.hasField(FIELD_FOCUSABLE) and child[FIELD_FOCUSABLE] = true
+                register(nav, child)
+                if child.hasField(FIELD_DEFAULT) and child[FIELD_DEFAULT] = true then nav.default = child
+                ' a focusable is a leaf boundary — don't descend into it
+            else
+                collect(nav, child)
+            end if
+        end for
+    end sub
+
+    ' Focus the scope's declared default (or the first focusable as a fallback).
+    sub focusDefault(nav as object)
+        target = nav.default
+        if target = invalid and nav.focusables.count() > 0 then target = nav.focusables[0]
+        focus(nav, target)
+    end sub
+
+    ' Register one focusable leaf. Order is irrelevant — geometry decides moves.
+    sub register(nav as object, node as object)
+        if node <> invalid then nav.focusables.push(node)
+    end sub
+
+    ' Register a whole array of leaves at once.
+    sub registerAll(nav as object, nodes as object)
+        if nodes = invalid then return
+        for each n in nodes
+            register(nav, n)
+        end for
+    end sub
+
+    ' Drop every registered leaf (e.g. before rebuilding a cluster).
+    sub clear(nav as object)
+        nav.focusables = []
+        nav.current = invalid
+    end sub
+
+    ' Land focus on a specific node. Visual focus state stays the leaf's own job.
+    sub focus(nav as object, node as object)
+        if node = invalid then return
+        nav.current = node
+        node.setFocus(true)
+    end sub
+
+    ' Move focus in a direction. Returns true if focus moved (consume the key),
+    ' false if there is no candidate that way (let the key bubble to the parent
+    ' scope — e.g. out of a cluster, or onto a list that owns its own scrolling).
+    function handleKey(nav as object, key as string) as boolean
+        dir = lcase(key)
+        if dir <> "left" and dir <> "right" and dir <> "up" and dir <> "down" then return false
+
+        cur = currentFocus(nav)
+        if cur = invalid then return false
+
+        target = bestCandidate(nav, cur, dir)
+        if target = invalid then return false
+
+        nav.current = target
+        target.setFocus(true)
+        return true
+    end function
+
+    ' ---- internals ----------------------------------------------------------
+
+    ' The live focus owner: trust the focus chain over our cached pointer, since
+    ' something outside the engine may have moved focus.
+    function currentFocus(nav as object) as object
+        if nav.current <> invalid and nav.current.isInFocusChain() then return nav.current
+        for each n in nav.focusables
+            if n.isInFocusChain() then return n
+        end for
+        return nav.current
+    end function
+
+    ' Absolute on-screen rect (+ centre) of a node, read fresh so it reflects the
+    ' settled layout. Only meaningful once a render pass has happened.
+    function rectOf(node as object) as object
+        r = node.sceneBoundingRect()
+        return {
+            x: r.x, y: r.y, w: r.width, h: r.height
+            cx: r.x + r.width / 2.0
+            cy: r.y + r.height / 2.0
+        }
+    end function
+
+    ' Nearest focusable strictly in `dir` from `current`, or invalid if none.
+    function bestCandidate(nav as object, current as object, dir as string) as object
+        c = rectOf(current)
+        best = invalid
+        bestScore = 0.0
+
+        for each n in nav.focusables
+            if not n.isSameNode(current) and isNavigable(n)
+                r = rectOf(n)
+                if eligible(c, r, dir)
+                    s = score(c, r, dir)
+                    if best = invalid or s < bestScore
+                        best = n
+                        bestScore = s
+                    end if
+                end if
+            end if
+        end for
+
+        return best
+    end function
+
+    ' A hidden node (or one under a hidden ancestor, e.g. an inactive tab panel)
+    ' is never a navigation target.
+    function isNavigable(node as object) as boolean
+        n = node
+        while n <> invalid
+            if n.hasField("visible") and not n.visible then return false
+            n = n.getParent()
+        end while
+        return true
+    end function
+
+    ' Eligible = laid out, on the `dir` side by centre, AND overlapping on the
+    ' perpendicular axis.
+    function eligible(c as object, r as object, dir as string) as boolean
+        if r.w <= 0 and r.h <= 0 then return false   ' not laid out / collapsed
+
+        if dir = "left"
+            return r.cx < c.cx - 1 and overlap1D(c.y, c.y + c.h, r.y, r.y + r.h) > 0
+        else if dir = "right"
+            return r.cx > c.cx + 1 and overlap1D(c.y, c.y + c.h, r.y, r.y + r.h) > 0
+        else if dir = "up"
+            return r.cy < c.cy - 1 and overlap1D(c.x, c.x + c.w, r.x, r.x + r.w) > 0
+        else ' down
+            return r.cy > c.cy + 1 and overlap1D(c.x, c.x + c.w, r.x, r.x + r.w) > 0
+        end if
+    end function
+
+    ' Lower is better: primary-axis travel + weighted perpendicular misalignment.
+    function score(c as object, r as object, dir as string) as float
+        if dir = "left" or dir = "right"
+            primary = abs(r.cx - c.cx)
+            secondary = abs(r.cy - c.cy)
+        else
+            primary = abs(r.cy - c.cy)
+            secondary = abs(r.cx - c.cx)
+        end if
+
+        return primary + secondary * ALIGN_WEIGHT
+    end function
+
+    ' Overlap length of [a0,a1] and [b0,b1]; <= 0 means they don't overlap.
+    function overlap1D(a0 as float, a1 as float, b0 as float, b1 as float) as float
+        lo = (a0 > b0) ? a0 : b0
+        hi = (a1 < b1) ? a1 : b1
+        return hi - lo
+    end function
+
+end namespace

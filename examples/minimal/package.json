@@ -1,0 +1,12 @@
+{
+  "name": "roku-spatial-navigation-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal demo channel for roku-spatial-navigation",
+  "scripts": {
+    "build": "bsc"
+  },
+  "devDependencies": {
+    "brighterscript": "^0.69.0"
+  }
+}

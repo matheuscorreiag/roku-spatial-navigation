@@ -1,0 +1,19 @@
+sub init()
+    ' Relay each option card's OK up via `selected`.
+    for each child in m.top.getChildren(-1, 0)
+        if child.hasField("selected") then child.observeField("selected", "onOptionSelected")
+    end for
+    m.top.visible = false
+end sub
+
+sub open()
+    m.top.visible = true
+end sub
+
+sub close()
+    m.top.visible = false
+end sub
+
+sub onOptionSelected(event as object)
+    m.top.selected = event.getRoSGNode().id
+end sub

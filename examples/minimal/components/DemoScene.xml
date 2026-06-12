@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Demo: a 2-D grid of focusable cards inside a SpatialNavRoot. Move with the
+     arrow keys (geometry decides the target). "Open Modal" opens a trapped scope.
+     The Modal lives inside the root but is marked spatialScope, so it's excluded
+     from the grid and navigated separately. -->
+<component name="DemoScene" extends="Scene">
+    <children>
+        <Rectangle width="1280" height="720" color="0x0A0D0FFF" />
+        <Label font="font:LargeBoldSystemFont" text="roku-spatial-navigation — demo" width="1120" height="56" translation="[80, 48]" color="0xFFFFFFFF" />
+        <Label font="font:SmallSystemFont" text="Arrow keys move focus by geometry. OK on 'Open Modal' traps focus; Back releases it." width="1120" height="32" translation="[80, 108]" color="0x8EA6C1FF" />
+
+        <SpatialNavRoot id="nav">
+            <FocusCard id="a" text="A" translation="[80, 170]" spatialDefault="true" />
+            <FocusCard id="b" text="B" translation="[360, 170]" />
+            <FocusCard id="c" text="C" translation="[640, 170]" />
+            <FocusCard id="d" text="D" translation="[80, 330]" />
+            <FocusCard id="e" text="E" translation="[360, 330]" />
+            <FocusCard id="openModal" text="Open Modal" translation="[640, 330]" />
+
+            <Modal id="modal" />
+        </SpatialNavRoot>
+    </children>
+</component>

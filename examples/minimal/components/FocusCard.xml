@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- A focusable card. `spatialFocusable` (default true) opts it into navigation;
+     the library never touches its visuals — it just calls setFocus, and the card
+     reacts via focusedChild. Fires `selected` on OK. -->
+<component name="FocusCard" extends="Group">
+    <interface>
+        <field id="text" type="string" onChange="onTextChanged" />
+        <field id="width" type="float" value="260" onChange="onLayout" />
+        <field id="height" type="float" value="120" onChange="onLayout" />
+        <field id="selected" type="boolean" alwaysNotify="true" />
+        <!-- Spatial-nav markers -->
+        <field id="spatialFocusable" type="boolean" value="true" />
+        <field id="spatialDefault" type="boolean" value="false" />
+    </interface>
+    <children>
+        <Rectangle id="bg" width="260" height="120" color="0x1B1F2AFF" />
+        <Label id="label" font="font:MediumBoldSystemFont" width="260" height="120" horizAlign="center" vertAlign="center" color="0xFFFFFFFF" />
+    </children>
+</component>
