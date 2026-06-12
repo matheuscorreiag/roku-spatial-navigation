@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SpatialNavScreen" extends="Group">
+    <interface>
+        <function name="focusDefault" />
+        <function name="handleFocus" />
+        <function name="sendFocusTo" />
+        <function name="releaseFocus" />
+        <function name="refresh" />
+    </interface>
+</component>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!-- A right-side modal. `spatialScope` marks the whole subtree as a self-contained
-     focus scope: SpatialNavRoot's base walk SKIPS it, and the scene opens it as a
+     focus scope: the screen's base walk SKIPS it, and the screen opens it as a
      trapped scope with sendFocusTo(). Its option cards are ordinary focusables. -->
 <component name="Modal" extends="Group">
     <interface>

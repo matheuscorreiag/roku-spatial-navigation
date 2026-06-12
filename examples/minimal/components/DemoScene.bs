@@ -1,44 +1,5 @@
-' The scene wires up content and semantics; SpatialNavRoot owns all focus/arrow
-' navigation. Note how little focus code lives here.
+' With no router to call handleFocus, the scene lands initial focus once the UI
+' exists. That single call is the only focus code in the whole demo.
 sub init()
-    m.nav = m.top.findNode("nav")
-    m.modal = m.top.findNode("modal")
-    m.modalOpen = false
-
-    m.top.findNode("openModal").observeField("selected", "onOpenModal")
-    m.modal.observeField("selected", "onModalChoice")
-
-    ' Land initial focus once the UI exists.
-    m.nav.callFunc("focusDefault")
+    m.top.findNode("content").callFunc("focusDefault")
 end sub
-
-sub onOpenModal()
-    if m.modalOpen then return
-    m.modalOpen = true
-    m.modal.callFunc("open")
-    ' Trap focus inside the modal — arrows can't reach the grid behind it.
-    m.nav.callFunc("sendFocusTo", m.modal)
-end sub
-
-sub onModalChoice()
-    closeModal()
-end sub
-
-sub closeModal()
-    if not m.modalOpen then return
-    m.modalOpen = false
-    m.modal.callFunc("close")
-    ' Restore focus to where the grid left off (the "Open Modal" card).
-    m.nav.callFunc("releaseFocus")
-end sub
-
-' Arrows are consumed by SpatialNavRoot below; unhandled keys bubble up to here.
-' Back closes the modal if open.
-function onKeyEvent(key as string, press as boolean) as boolean
-    if not press then return false
-    if key = "back" and m.modalOpen
-        closeModal()
-        return true
-    end if
-    return false
-end function

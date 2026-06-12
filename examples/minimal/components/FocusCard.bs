@@ -33,7 +33,7 @@ sub applyFocus(focused as boolean)
     end if
 end sub
 
-' Let arrow keys bubble to SpatialNavRoot; only consume OK.
+' Let arrow keys bubble to the SpatialNavScreen; only consume OK.
 function onKeyEvent(key as string, press as boolean) as boolean
     if press and key = "OK"
         m.top.selected = true

@@ -1,0 +1,39 @@
+' Wires content + semantics; the SpatialNavScreen base owns all focus/arrow
+' navigation. Note how little focus code lives here — modal open/close and Back.
+' sendFocusTo / releaseFocus / onScreenKey are inherited from the base.
+sub init()
+    m.modal = m.top.findNode("modal")
+    m.modalOpen = false
+
+    m.top.findNode("openModal").observeField("selected", "onOpenModal")
+    m.modal.observeField("selected", "onModalChoice")
+end sub
+
+sub onOpenModal()
+    if m.modalOpen then return
+    m.modalOpen = true
+    m.modal.callFunc("open")
+    ' Trap focus inside the modal — arrows can't reach the grid behind it.
+    sendFocusTo(m.modal)
+end sub
+
+sub onModalChoice()
+    closeModal()
+end sub
+
+sub closeModal()
+    if not m.modalOpen then return
+    m.modalOpen = false
+    m.modal.callFunc("close")
+    ' Restore focus to where the grid left off (the "Open Modal" card).
+    releaseFocus()
+end sub
+
+' Non-arrow keys land here (the base consumes arrows itself). Back closes the modal.
+function onScreenKey(key as string) as boolean
+    if key = "back" and m.modalOpen
+        closeModal()
+        return true
+    end if
+    return false
+end function

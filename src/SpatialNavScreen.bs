@@ -1,0 +1,66 @@
+import "pkg:/source/SpatialNav.bs"
+
+function handleFocus(data as object) as boolean
+    m.stack = [{ root: m.top, nav: SpatialNav.scope(m.top) }]
+    SpatialNav.focusDefault(activeScope())
+    if activeScope().focusables.count() = 0 then m.top.setFocus(true)
+    return true
+end function
+
+function activeEntry() as object
+    if m.stack = invalid or m.stack.count() = 0 then return invalid
+    return m.stack[m.stack.count() - 1]
+end function
+
+function activeScope() as object
+    e = activeEntry()
+    if e = invalid then return invalid
+    return e.nav
+end function
+
+sub ensureStack()
+    if m.stack = invalid then m.stack = [{ root: m.top, nav: SpatialNav.scope(m.top) }]
+end sub
+
+sub refresh()
+    ensureStack()
+    e = activeEntry()
+    e.nav = SpatialNav.scope(e.root)
+end sub
+
+sub focusDefault()
+    ensureStack()
+    SpatialNav.focusDefault(activeScope())
+end sub
+
+sub sendFocusTo(rootNode as object)
+    ensureStack()
+    m.stack.push({ root: rootNode, nav: SpatialNav.scope(rootNode) })
+    SpatialNav.focusDefault(activeScope())
+end sub
+
+sub releaseFocus()
+    if m.stack = invalid or m.stack.count() <= 1 then return
+    m.stack.pop()
+    parent = activeScope()
+    if parent.current <> invalid
+        SpatialNav.focus(parent, parent.current)
+    else
+        SpatialNav.focusDefault(parent)
+    end if
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    ensureStack()
+    e = activeEntry()
+    if e <> invalid
+        e.nav = SpatialNav.scope(e.root)
+        if SpatialNav.handleKey(e.nav, key) then return true
+    end if
+    return onScreenKey(key)
+end function
+
+function onScreenKey(key as string) as boolean
+    return false
+end function

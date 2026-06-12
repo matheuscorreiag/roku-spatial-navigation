@@ -20,15 +20,22 @@ direction), which is closer to what "spatial" usually means.
 
 ## How it works
 
-1. Mark focusable nodes in XML with `spatialFocusable="true"`.
-2. Wrap them in a `<SpatialNavRoot>`.
-3. Call `focusDefault()` once. Arrow keys now move focus by geometry.
+The recommended way is a **base screen**: your screens extend `SpatialNavScreen`,
+which owns focus and arrow navigation for everything beneath it.
 
-The root walks its subtree once, gathers the marked nodes, and on each arrow press
-reads their rects and moves focus to the nearest eligible one. A candidate is only
-eligible if it overlaps the current node on the perpendicular axis (so Left never
-jumps diagonally to something that's really *above* you), which keeps movement
-predictable while still allowing big gap jumps within a row/column.
+1. Make your screen `extends SpatialNavScreen`.
+2. Mark focusable nodes in XML with `spatialFocusable="true"`.
+3. Activate it once: a router calls `handleFocus` on the screen when its route
+   activates, or you call `focusDefault()` yourself after mounting.
+
+On each arrow press the screen reads the marked nodes' rects and moves focus to the
+nearest eligible one. A candidate is only eligible if it overlaps the current node on
+the perpendicular axis (so Left never jumps diagonally to something that's really
+_above_ you), which keeps movement predictable while still allowing big gap jumps
+within a row/column.
+
+> Even a single-screen app uses a `SpatialNavScreen` — make your screen extend it and
+> land focus with one `focusDefault()` call (see [Quick start](#quick-start)).
 
 ---
 
@@ -37,13 +44,13 @@ predictable while still allowing big gap jumps within a row/column.
 No package manager yet — grab the files from [`src/`](src/) (download the repo zip
 and drag them in) and drop them into your channel:
 
-| File | Put it in |
-|------|-----------|
-| `src/SpatialNav.bs` | `source/SpatialNav.bs` |
-| `src/SpatialNavRoot.xml` | `components/SpatialNavRoot.xml` |
-| `src/SpatialNavRoot.bs` | `components/SpatialNavRoot.bs` |
+| File                       | Put it in                         |
+| -------------------------- | --------------------------------- |
+| `src/SpatialNav.bs`        | `source/SpatialNav.bs`            |
+| `src/SpatialNavScreen.xml` | `components/SpatialNavScreen.xml` |
+| `src/SpatialNavScreen.bs`  | `components/SpatialNavScreen.bs`  |
 
-`SpatialNavRoot.bs` imports the engine as `pkg:/source/SpatialNav.bs`, so keep
+`SpatialNavScreen.bs` imports the engine as `pkg:/source/SpatialNav.bs`, so keep
 `SpatialNav.bs` in `source/` (or update that one import).
 
 > Written in **BrighterScript** (`.bs`) — the standard modern Roku toolchain
@@ -55,27 +62,36 @@ and drag them in) and drop them into your channel:
 
 ## Quick start
 
-**MainScene.xml**
+**HomeScreen.xml** — a screen is just a `SpatialNavScreen` with focusables in it:
 
 ```xml
-<component name="MainScene" extends="Scene">
+<component name="HomeScreen" extends="SpatialNavScreen">
     <children>
-        <SpatialNavRoot id="nav">
-            <!-- any focusable components; markers opt them in -->
-            <MyButton text="One"   translation="[80, 100]"  spatialFocusable="true" spatialDefault="true" />
-            <MyButton text="Two"   translation="[80, 200]"  spatialFocusable="true" />
-            <MyButton text="Three" translation="[80, 300]"  spatialFocusable="true" />
-        </SpatialNavRoot>
+        <!-- any focusable components; markers opt them in -->
+        <MyButton text="One"   translation="[80, 100]" spatialFocusable="true" spatialDefault="true" />
+        <MyButton text="Two"   translation="[80, 200]" spatialFocusable="true" />
+        <MyButton text="Three" translation="[80, 300]" spatialFocusable="true" />
     </children>
 </component>
 ```
 
-**MainScene.bs**
+**Activate it.** If you use a router, it calls `handleFocus` on the screen for you on
+every route change — nothing to write. Without a router, land focus once from
+whatever hosts the screen:
+
+```xml
+<!-- MainScene.xml -->
+<component name="MainScene" extends="Scene">
+    <children>
+        <HomeScreen id="home" />
+    </children>
+</component>
+```
 
 ```brightscript
+' MainScene.bs
 sub init()
-    ' Land focus once the UI exists. That's the only line you need.
-    m.top.findNode("nav").callFunc("focusDefault")
+    m.top.findNode("home").callFunc("focusDefault")
 end sub
 ```
 
@@ -98,39 +114,60 @@ calls `setFocus(true)`; you render the focused look however you like (e.g. obser
 
 ### Markers
 
-| Field | Meaning |
-|-------|---------|
+| Field              | Meaning                                                                                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `spatialFocusable` | Opt this node into navigation. It's treated as a **leaf** — the walk won't descend into it, so a node that owns its own internals (a custom button, a `MarkupList`) is registered whole. |
-| `spatialDefault` | This node gets focus when its scope activates (`focusDefault` / `sendFocusTo`). |
-| `spatialScope` | This whole subtree is a **separate** scope (a modal/sheet). The base walk skips it; you activate it with `sendFocusTo` (see below). |
+| `spatialDefault`   | This node gets focus when its scope activates (`focusDefault` / `sendFocusTo`).                                                                                                          |
+| `spatialScope`     | This whole subtree is a **separate** scope (a modal/sheet). The base walk skips it; you activate it with `sendFocusTo` (see below).                                                      |
 
 You can also set these in code for built‑in nodes, e.g.
 `myMarkupList.addFields({ spatialFocusable: true })`.
 
 ---
 
+## Activating a screen
+
+A screen needs exactly one nudge to build its scope and land initial focus, because
+SceneGraph won't run an inherited `init()` once your screen defines its own. Two ways:
+
+- **`handleFocus(data)`** — the hook a router calls when a route activates. Most
+  routers (e.g. sgRouter) call it automatically, so router apps write _zero_ focus
+  code and get correct focus on every navigation.
+- **`focusDefault()`** — call it once yourself after the screen is mounted (see Quick
+  start) when there's no router.
+
+After that it's hands-off. The screen also **re-discovers focusables on every arrow
+press** (a cheap re-walk; the focused node is recovered from the live focus chain),
+so nodes you add or remove at runtime just work — no `refresh()` needed. `refresh()`
+still exists for forcing a rebuild outside a keypress.
+
+---
+
 ## Modals & sheets (trapped focus)
 
-Focus is a **stack** of scopes. Opening a modal should *trap* focus inside it
+Focus is a **stack** of scopes. Opening a modal should _trap_ focus inside it
 (arrows mustn't reach what's underneath) and closing it should restore focus to
-where it was. That's two calls:
+where it was. From inside the screen, that's two inherited calls:
 
 ```brightscript
 ' open: trap focus inside the sheet's subtree
-m.nav.callFunc("sendFocusTo", m.sheet)
+m.sheet.callFunc("open")
+sendFocusTo(m.sheet)
 
 ' close: pop back and restore focus to where the parent scope left off
-m.nav.callFunc("releaseFocus")
+m.sheet.callFunc("close")
+releaseFocus()
 ```
 
 Mark the sheet's root `spatialScope="true"` so the base navigation ignores it until
-you open it. Keys the root doesn't consume (like **Back**) bubble past to your
-scene, so you close the sheet from there:
+you open it. Non-arrow keys (like **Back**) land in the screen's `onScreenKey`
+override — close the sheet from there:
 
 ```brightscript
-function onKeyEvent(key as string, press as boolean) as boolean
-    if press and key = "back" and m.sheetOpen
-        closeSheet()   ' -> m.nav.callFunc("releaseFocus")
+' the base consumes arrows itself; override onScreenKey for everything else
+function onScreenKey(key as string) as boolean
+    if key = "back" and m.sheetOpen
+        closeSheet()   ' -> releaseFocus()
         return true
     end if
     return false
@@ -139,31 +176,27 @@ end function
 
 ---
 
-## Engine-only usage (no SpatialNavRoot)
+## Using a router (e.g. sgRouter)
 
-`SpatialNavRoot` is just a thin wrapper over [`SpatialNav.bs`](src/SpatialNav.bs).
-If you'd rather drive focus from your own component:
+If your router mounts screens and calls `handleFocus` on activation, the base screen
+plugs straight in — every route gets focus and arrow navigation for free, and the
+modal stack lives on the screen where its lifecycle already is.
 
-```brightscript
-import "pkg:/source/SpatialNav.bs"
-
-sub init()
-    m.nav = SpatialNav.scope(m.top)   ' gather marked focusables in this subtree
-    SpatialNav.focusDefault(m.nav)
-end sub
-
-function onKeyEvent(key as string, press as boolean) as boolean
-    if not press then return false
-    return SpatialNav.handleKey(m.nav, key)   ' true = moved, false = bubble
-end function
-```
+One Roku constraint to know: a screen can extend **one** base. If your router
+requires its screens to extend _its_ view base (sgRouter's screens extend
+`sgrouter_View`), you can't also `extends SpatialNavScreen`. In that case, copy
+`SpatialNavScreen.bs`'s body into your router's base view — it's self-contained (only
+imports `SpatialNav.bs`), so your `Screen extends sgrouter_View` gains the exact same
+behavior. Your concrete screens then declare focusables and override `onScreenKey`,
+unchanged.
 
 ---
 
 ## Run the example
 
 A complete, sideloadable demo lives in [`examples/minimal`](examples/minimal): a
-2‑D grid of focusable cards plus a trapped modal.
+`DemoContent` screen (a `SpatialNavScreen`) with a 2‑D grid of focusable cards plus a
+trapped modal, hosted by a thin scene that lands initial focus.
 
 ```bash
 cd examples/minimal
@@ -175,21 +208,23 @@ Sideload `out/spatialnav-demo.zip` from your Roku's Development Application
 Installer (`http://<roku-ip>/` → Upload). Then:
 
 - **Arrow keys** move focus across the grid by geometry.
-- **OK** on *Open Modal* opens the sheet and traps focus in it.
+- **OK** on _Open Modal_ opens the sheet and traps focus in it.
 - **Back** releases the trap and restores focus.
 
 ---
 
 ## API
 
-**`SpatialNavRoot`** (component) — `callFunc` these:
+**`SpatialNavScreen`** (base component) — subclass it; override / `callFunc` these:
 
-| Function | Description |
-|----------|-------------|
-| `focusDefault()` | Land focus on the `spatialDefault` node (or the first focusable). Call once after the UI exists. |
-| `sendFocusTo(node)` | Open a trapped sub‑scope over `node`. |
-| `releaseFocus()` | Close the top sub‑scope and restore focus underneath. |
-| `refresh()` | Rebuild the base scope after adding/removing focusables at runtime. |
+| Member              | Description                                                                                                       |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `handleFocus(data)` | Router activation hook: (re)builds the scope and lands default focus. Returns `true`. Routers call this for you.  |
+| `focusDefault()`    | Land focus on the `spatialDefault` node (or the first focusable). Call once after mounting if you have no router. |
+| `onScreenKey(key)`  | **Override** for non-arrow keys (Back, etc.). Default returns `false`. The base handles arrows before this.       |
+| `sendFocusTo(node)` | Open a trapped sub‑scope over `node` (a modal/sheet).                                                             |
+| `releaseFocus()`    | Close the top sub‑scope and restore focus underneath.                                                             |
+| `refresh()`         | Force a scope rebuild. Rarely needed — focusables are re-discovered each arrow press.                             |
 
 **`SpatialNav`** (engine namespace) — `scope(root)`, `create()`, `register(nav,
 node)`, `registerAll(nav, nodes)`, `clear(nav)`, `focus(nav, node)`,

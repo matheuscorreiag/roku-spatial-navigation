@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- The demo "screen": a 2-D grid of focusable cards plus a trapped modal, built as
+     a SpatialNavScreen subclass. The base owns focus + arrow navigation for this
+     whole subtree; this screen only declares focusables and handles semantics. -->
+<component name="DemoContent" extends="SpatialNavScreen">
+    <children>
+        <FocusCard id="a" text="A" translation="[80, 170]" spatialDefault="true" />
+        <FocusCard id="b" text="B" translation="[360, 170]" />
+        <FocusCard id="c" text="C" translation="[640, 170]" />
+        <FocusCard id="d" text="D" translation="[80, 330]" />
+        <FocusCard id="e" text="E" translation="[360, 330]" />
+        <FocusCard id="openModal" text="Open Modal" translation="[640, 330]" />
+
+        <Modal id="modal" />
+    </children>
+</component>
